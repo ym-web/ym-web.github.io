@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+    .dollar {
+        stroke-width:2px;
+    }
+    body {
+        font: 12px sans-serif;
+        width: 960px;
+        height: 500px;
+        position: relative;
+    }
+
+</style>
+
+<script src="https://d3js.org/d3.v4.js"></script>
+<h2>Output of Different Sections</h2>
+<p>A stacked area chart below is to show the trend of output valued in constant usd (2005) of different divisions in ISIC.</p>
+<p>Since mining and utilities are closed related to manufacturing, we consider them as one in this chart.</p>
+<p>Even though output of every section has been increasing over years, the lion share goes to services related sections....</p>
+<div id="trends"></div>
+<p>
+<ul>
+    <li><a href="index.html">Back to the introduction</a></li>
+    <li><a href="manufacturing%20world%20shares.html">Manufacturing world share</a></li>
+    <li><a href="International%20Trade.html">Trend of international trade</a></li>
+</ul>
+</p>
+<script>
+
+    var margin = {top: 60, right: 230, bottom: 50, left: 150},
+        width = 960 - margin.left - margin.right,
+        height = 450 - margin.top - margin.bottom;
+
+    var svg = d3.select("#trends")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
+    const sectionNames = {
+        "AB": "Agriculture, hunting, forestry, fishing",
+        "CE": "Mining, Manufacturing, Utilities",
+        "F": "Construction",
+        "GH": "Hospitality and retail trade",
+        "I": "Logistics",
+        "JP": "Other Activities"
+    };
+
+    d3.csv("sections_output.csv", function(data) {
+        var keys = data.columns.slice(1);
+
+
+        var color = d3.scaleOrdinal()
+            .domain(keys)
+            .range(["#74b741", "#ff6767", "#273f8a", "#ff0000", "#008080", "#5bc0de"]);
+
+        var stackedData = d3.stack()
+            .keys(keys)
+            (data)
+
+
+
+        var x = d3.scaleLinear()
+            .domain(d3.extent(data, function(d) { return d["Year"]; }))
+            .range([ 0, width ]);
+        var xAxis = svg.append("g")
+            .attr("class", "xaxis")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x).ticks(20, ".0f"));
+
+
+        svg.append("text")
+            .attr("text-anchor", "end")
+            .attr("x", width / 2)
+            .attr("y", height+40 )
+            .style("font-size", "12px")
+            .text("Time (year)");
+
+
+        svg.append("text")
+            .attr("text-anchor", "left")
+            .attr("x", width / 2 - 100)
+            .attr("y", -20 )
+            .text("Output Trends for Sections")
+            .attr("text-anchor", "start")
+
+        formatValue = d3.format(".2s");
+        var y = d3.scaleLinear()
+            .domain([0, 20000000000000])
+            .range([ height, 0 ]);
+        svg.append("g")
+            .attr("class", "dollar")
+            .call(d3.axisLeft(y).ticks(10).tickFormat(function(d) {
+                return '$'+ formatValue(d).replace('T', 'Trillion');
+            }));
+
+        var clip = svg.append("defs").append("svg:clipPath")
+            .attr("id", "clip")
+            .append("svg:rect")
+            .attr("width", width )
+            .attr("height", height )
+            .attr("x", 0)
+            .attr("y", 0);
+
+        var brush = d3.brushX()
+            .extent( [ [0,0], [width,height] ] )
+            .on("end", updateChart)
+
+
+        var areaChart = svg.append('g')
+            .attr("clip-path", "url(#clip)")
+
+
+        var area = d3.area()
+            .x(function(d) { return x(d.data["Year"]); })
+            .y0(function(d) { return y(d[0]); })
+            .y1(function(d) { return y(d[1]); })
+
+
+        areaChart
+            .selectAll("mylayers")
+            .data(stackedData)
+            .enter()
+            .append("path")
+            .attr("class", function(d) { return "myArea " + d.key })
+            .style("fill", function(d) { return color(d.key); })
+            .attr("d", area)
+
+        // Add the brushing
+        areaChart
+            .append("g")
+            .attr("class", "brush")
+            .call(brush);
+
+        var idleTimeout
+        function idled() { idleTimeout = null; }
+
+
+        function updateChart() {
+
+            extent = d3.event.selection
+
+            if(!extent){
+                if (!idleTimeout) return idleTimeout = setTimeout(idled, 350);
+                x.domain(d3.extent(data, function(d) { return d["Year"]; }))
+            }else{
+                x.domain([ x.invert(extent[0]), x.invert(extent[1]) ])
+                areaChart.select(".brush").call(brush.move, null)
+            }
+
+
+            xAxis.transition().duration(1000).call(d3.axisBottom(x).ticks(20, ".0f"))
+            areaChart
+                .selectAll("path")
+                .transition().duration(1000)
+                .attr("d", area)
+        }
+
+        var highlight = function(d){
+            d3.selectAll(".myArea").style("opacity", .1)
+            d3.select("."+d).style("opacity", 1)
+
+            if (d === "CE" || d === "AB") {
+                svg.append("foreignObject")
+                        .attr("class", "annotation")
+                        .attr("x", 600)
+                        .attr("y", height / 2)
+                        .attr("width", "200")
+                        .attr("height", "120")
+                        .append("xhtml:div")
+                        .style("font", "12px 'Helvetica Neue'")
+                        .style("color", color(d))
+                        .html(function() {
+                            return "<p>The output of the section</p>" +
+                                    "<p><em><b>" + sectionNames[d] +"</b></em></p>" +
+                                    "<p> has increased insiginificantly </p>"
+                        });
+            } else if (d === "F") {
+                svg.append("foreignObject")
+                    .attr("class", "annotation")
+                    .attr("x", 600)
+                    .attr("y", height / 2)
+                    .attr("width", "200")
+                    .attr("height", "120")
+                    .append("xhtml:div")
+                    .style("font", "12px 'Helvetica Neue'")
+                    .style("color", color(d))
+                    .html(function() {
+                        return "<p>The output of the section</p>" +
+                            "<p><em><b>" + sectionNames[d] +"</b></em></p>" +
+                            "<p> has not changed </p>"
+                    });
+            } else {
+                svg.append("foreignObject")
+                    .attr("class", "annotation")
+                    .attr("x", 600)
+                    .attr("y", height / 2)
+                    .attr("width", "200")
+                    .attr("height", "120")
+                    .append("xhtml:div")
+                    .style("font", "12px 'Helvetica Neue'")
+                    .style("color", color(d))
+                    .html(function() {
+                        return "<p>The output of the section</p>" +
+                            "<p><em><b>" + sectionNames[d] +"</b></em></p>" +
+                            "<p> has increased significantly </p>"
+                    });
+            }
+
+
+        }
+
+        var noHighlight = function(d){
+            d3.selectAll(".myArea").style("opacity", 1)
+            d3.selectAll(".annotation").remove();
+        }
+
+        var size = 10
+        svg.selectAll("myrect")
+            .data(keys)
+            .enter()
+            .append("rect")
+            .attr("class", "selectionButton")
+            .attr("x", 600)
+            .attr("y", function(d,i){ return 30 + i*(size+5)})
+            .attr("width", size)
+            .attr("height", size)
+            .style("fill", function(d){ return color(d)})
+            .on("mouseover", highlight)
+            .on("mouseleave", noHighlight)
+
+        svg.selectAll("mylabels")
+            .data(keys)
+            .enter()
+            .append("text")
+            .attr("x", 600 + size*1.2)
+            .attr("y", function(d,i){ return 30 + i*(size+5) + (size/2)})
+            .style("fill", function(d){ return color(d)})
+            .text(function(d){ return sectionNames[d]})
+            .attr("text-anchor", "left")
+            .style("alignment-baseline", "middle")
+            .style("font-size", "12px")
+            .on("mouseover", highlight)
+            .on("mouseleave", noHighlight)
+
+        svg.append("text")
+            .attr("x", 600)
+            .attr("y", 10)
+            .style("fill", "blue")
+            .text("Point & Highlight:")
+            .attr("text-anchor", "left")
+            .style("alignment-baseline", "middle")
+            .style("font-size", "14px")
+
+    })
+</script>

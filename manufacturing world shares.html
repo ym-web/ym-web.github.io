@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>World manufacturing shares</title>
+    <style>
+        body {
+            font: 12px sans-serif;
+            width: 960px;
+            height: 500px;
+            position: relative;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        path.slice{
+            stroke-width:2px;
+        }
+        polyline{
+            opacity: .3;
+            stroke: black;
+            stroke-width: 2px;
+            fill: none;
+        }
+        .legend rect {
+            fill:white;
+            stroke:black;
+            opacity:0.8;
+        }
+        button {
+            display: inline-block;
+            font-size: 10px;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            outline: none;
+            color: #fff;
+            background-color: #4CAF50;
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 3px #999;
+        }
+        button:hover {background-color: #3e8e41}
+        button:active {
+            background-color:red;
+            box-shadow: 0 5px #666;
+            transform: translateY(4px);
+        }
+        #tooltip {
+            opacity: 0;
+            position: absolute;
+            text-align: left;
+            width: 140px; height: 80px;
+            border: 0px;
+            border-radius: 10px;
+            background-color: #91A6B4;
+        }
+
+    </style>
+    <script src="https://d3js.org/d3.v4.js"></script>
+
+</head>
+<body>
+<h2>World Manufacturing Shares</h2>
+<p>A donut chart below is to show the manufacturing output shares of G20 countries and other countries in the world.</p>
+<p>The share of manufacturing output of the United States has been declining every year and falling behind the share of China since 2009.</p>
+<p>The gap between the manufacturing output of America and China has been getting wider....</p>
+<div class="container">
+    <p style = "color: blue">Select year:</p>
+    <p><div class="yearButton" ></div></p>
+    <p>
+    <div id="tooltip"></div>
+    </p>
+</div>
+<p>
+<ul>
+    <li><a href="index.html">Back to the introduction</a></li>
+    <li><a href="sections%20trend.html">Trend of different economical divisions</a></li>
+    <li><a href="International%20Trade.html">Trend of international trade</a></li>
+</ul>
+</p>
+<script>
+    var svg = d3.select("body")
+        .append("svg")
+        .append("g")
+    svg.append("g")
+        .attr("class", "slices");
+    svg.append("g")
+        .attr("class", "annotation");
+    svg.append("g")
+        .attr("class", "lines");
+
+    var margin = {top: 60, right: 230, bottom: 50, left: 150},
+        width = 960 - margin.left - margin.right,
+        height = 450 - margin.top - margin.bottom;
+    // var width = 960,
+    //     height = 450,
+        radius = Math.min(width, height) / 2;
+
+    var years = [2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018];
+
+    var color = d3.scaleOrdinal(d3.schemeCategory20);
+
+    var pie = d3.pie().value(function(d) {
+        return d.Value;
+    });
+
+    var arc = d3.arc()
+        .outerRadius(radius * 0.8)
+        .innerRadius(radius * 0.4);
+
+    var outerArc = d3.arc()
+        .innerRadius(radius * 0.95)
+        .outerRadius(radius * 0.95);
+
+    svg.attr("transform", "translate(" + 250 + "," + height / 2 + ")");
+
+    var key = function(d){ return d.data.Country; };
+
+    d3.csv("manufacturing_output.csv", function(error, data) {
+        if (error) {
+            throw error;
+        }
+
+        d3.select(".yearButton")
+            .selectAll("button")
+            .data(years)
+            .enter().append("button")
+            .attr("id", function (d) {return "button" + d})
+            .text(function (d) { return d; })
+            .on("click", function (buttonValue) {
+                var annualDate = [];
+                var worldOutput = 0;
+                var first = {Country: null, Value: 0};
+                var second = {Country: null, Value: 0};
+                var firstColor = null;
+                var secColor = null;
+                var firstAnno;
+                var secAnno;
+                for (let i = 0; i < data.length; i++) {
+                    if (data[i].Country !== "World") {
+                        annualDate.push({
+                            Country: data[i].Country,
+                            Value: data[i]["Value_"+buttonValue]
+                        });
+                        if (data[i].Country !== "Others") {
+                            if (parseInt(data[i]["Value_"+buttonValue]) > parseInt(first.Value)) {
+                                second.Country = first.Country;
+                                second.Value = first.Value;
+
+                                first.Country = data[i].Country;
+                                first.Value = data[i]["Value_"+buttonValue];
+
+                            } else if (parseInt(data[i]["Value_"+buttonValue]) > parseInt(second.Value)) {
+                                second.Country = data[i].Country;
+                                second.Value = data[i]["Value_"+buttonValue];
+
+                            }
+
+                        }
+                    } else {
+                        worldOutput = data[i]["Value_"+buttonValue];
+                    }
+                }
+
+                svg.select(".title")
+                    .remove()
+
+                svg.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("class", "title")
+                    .style("background-color","red")
+                    .style("font-size","20px")
+                    .text("Year " + buttonValue)
+
+                var tooltip = d3.select("#tooltip");
+
+                var slice = svg.select(".slices").selectAll("path.slice")
+                    .data(pie(annualDate), key);
+
+                slice.enter()
+                    .insert("path")
+                    .merge(slice)
+                    .style("fill", function(d, i) {
+                        console.log("call slice enter");
+                        if (d.data.Country === first.Country) {
+                            firstColor = color(i);
+
+                        } else if (d.data.Country === second.Country) {
+                            secColor = color(i);
+
+                        }
+                        return color(i);
+                    })
+                    .attr("class", "slice")
+                    .on("mouseover", function(d) {
+                        tooltip.style("opacity", 1)
+                            .style("left", (d3.event.pageX) + "px")
+                            .style("top", (d3.event.pageY) + "px")
+                            .style("font-size", "10px")
+                            .html("<p>"+ "Country: " + "<b><em>" + d.data.Country + "</b></em>"+"</p>"
+                                + "<p>"+"Output: $"+ "<b><em>" + Number(d.data.Value).toLocaleString('en') + "</b></em>"
+                                +"</p>" + "<p>" + "Share: " + "<b><em>" + d.data.Value / worldOutput * 100 +
+                                "% </b></em></p>");
+                    })
+                    .on("mouseout", function() { tooltip.style("opacity", 0) })
+
+
+                slice
+                    .transition().duration(1000)
+                    .attrTween("d", function(d) {
+                        this._current = this._current || d;
+                        var interpolate = d3.interpolate(this._current, d);
+                        this._current = interpolate(0);
+                        return function(t) {
+                            return arc(interpolate(t));
+                        };
+                    })
+
+                slice.exit()
+                    .remove();
+
+                d3.select(".annotation").selectAll("foreignObject").select("div").remove();
+
+                firstAnno = "<p><b><em><span style='" + "color:" + firstColor + "'>" + first.Country +
+                    "</span></em></b> was the largest </p>" +
+                    "<p>manufacturing power in " + buttonValue + "</p>";
+                secAnno = "<p><b><em><span style='" + "color:" + secColor + "'>" + second.Country + "</span></em></b>" +
+                    " produced</p><p>about " + parseFloat(second.Value / first.Value * 100).toFixed(2) + "% of the " +
+                    first.Country + " produced in " + buttonValue + "</p>";
+
+                svg.append("g")
+                    .attr("class", "annotation");
+
+                var annotation = svg.select(".annotation").selectAll("foreignObject")
+                    .data(pie(annualDate));
+
+
+                annotation.enter()
+                    .append("foreignObject")
+                    .merge(annotation)
+                    .attr("width", "130")
+                    .attr("height", "120")
+                    .append("xhtml:div")
+                    .style("font", "10px 'Helvetica Neue'")
+                    .html(function(d) {
+                        if (d.data.Country === first.Country) {
+                            console.log(firstAnno);
+                            return firstAnno;
+
+                        } else if (d.data.Country === second.Country) {
+                            return secAnno;
+                        }
+                    });
+
+                function midAngle(d){
+                    return d.startAngle + (d.endAngle - d.startAngle)/2;
+                }
+
+                annotation.transition().duration(1000)
+                    .attrTween("transform", function(d) {
+                        this._current = this._current || d;
+                        var interpolate = d3.interpolate(this._current,d);
+                        this._current = interpolate(0);
+                        return function(t) {
+                            var d2 = interpolate(t);
+                            var pos = outerArc.centroid(d2);
+                            pos[0] = radius * (midAngle(d2) < Math.PI ? 1 : -1);
+                            return "translate("+ pos +")";
+                        };
+                    })
+                    .styleTween("text-anchor", function(d){
+                        this._current = this._current || d;
+                        var interpolate = d3.interpolate(this._current, d);
+                        this._current = interpolate(0);
+                        return function(t) {
+                            var d2 = interpolate(t);
+                            return midAngle(d2) < Math.PI ? "start":"end";
+                        };
+                    });
+
+
+                annotation.exit().remove();
+
+                var polyline = svg.select(".lines").selectAll("polyline")
+                    .data(pie(annualDate), key);
+
+                polyline.enter()
+                    .append("polyline")
+                    .merge(polyline)
+                    .style("opacity", function (d) {
+                        if (d.data.Country !== first.Country && d.data.Country !== second.Country) {
+                            return "0";
+                        }
+                        return ".3";
+                    });
+
+                polyline.transition().duration(1000)
+                    .attrTween("points", function(d){
+                        this._current = this._current || d;
+                        var interpolate = d3.interpolate(this._current, d);
+                        this._current = interpolate(0);
+                        return function(t) {
+                            var d2 = interpolate(t);
+                            var pos = outerArc.centroid(d2);
+                            pos[0] = radius * 0.95 * (midAngle(d2) < Math.PI ? 1 : -1);
+                            return [arc.centroid(d2), outerArc.centroid(d2), pos];
+                        };
+                    });
+
+                polyline.exit().remove();
+
+                var legendDot = svg.selectAll("dot")
+                    .data(annualDate);
+
+                legendDot.enter()
+                    .append("circle")
+                    .merge(legendDot)
+                    .attr("cx", 250)
+                    .attr("cy", function(d,i){ return height / 8 + i * 10})
+                    .attr("r", 3)
+                    .style("fill", function(d, i){ return color(i)})
+
+                var legendLabels = svg.selectAll("label")
+                    .data(annualDate);
+
+                legendLabels.enter()
+                    .append("text")
+                    .merge(legendLabels)
+                    .attr("x", 270)
+                    .attr("y", function(d,i){ return height / 8 + i * 10})
+                    .style("fill", function(d){ return color(d)})
+                    .text(function(d){ return d.Country; })
+                    .attr("text-anchor", "left")
+                    .style("font-size","8px")
+                    .style("alignment-baseline", "middle")
+            })
+
+        document.getElementById("button2005").click()
+        document.getElementById("button2005").click()
+
+    });
+
+</script>
+</body>
+</html>

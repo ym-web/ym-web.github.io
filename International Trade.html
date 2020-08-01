@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+    body {
+        font: 12px sans-serif;
+        width: 960px;
+        height: 500px;
+        position: relative;
+    }
+    /*#selectButton {*/
+    /*    position: absolute;*/
+    /*    left: 300px;*/
+    /*    top: 150px;*/
+    /*}*/
+</style>
+
+<script src="https://d3js.org/d3.v4.js"></script>
+<h2>The trend of International Trade</h2>
+<p>The line chart below is to show the history of the international trade of goods of the United Stated.</p>
+<p>Since the volume of the trade of agricultural products is very small, it is sound to assume that the value of the trade of goods
+    reflects the value of the trade of industry product.</p>
+<p>The trends of import and export are very like each other. However, the trade deficit has been increasing shockingly over years...</p>
+<select id="selectButton"></select>
+<div id='tooltip' style='position:absolute;background-color:lightgray;padding:5px'></div>
+<div id="my_dataviz"></div>
+<p>
+<ul>
+    <li><a href="index.html">Back to the introduction</a></li>
+    <li><a href="manufacturing%20world%20shares.html">Manufacturing world share</a></li>
+    <li><a href="sections%20trend.html">Trend of different economical divisions</a></li>
+</ul>
+</p>
+<script>
+
+    // set the dimensions and margins of the graph
+    var margin = {top: 10, right: 30, bottom: 30, left: 150},
+        width = 960 - margin.left - margin.right,
+        height = 450 - margin.top - margin.bottom;
+
+    // append the svg object to the body of the page
+    var svg = d3.select("#my_dataviz")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
+
+    d3.csv("trades_of_goods.csv", function(data) {
+
+        var allGroup = ["Export & Import", "Net Trade"];
+
+        const tooltip = d3.select('#tooltip');
+        const tooltipLine = svg.append('line');
+
+        d3.select("#selectButton")
+            .selectAll('myOptions')
+            .data(allGroup)
+            .enter()
+            .append('option')
+            .text(function (d) { return d; })
+            .attr("value", function (d) { return d; })
+
+
+        var x = d3.scaleLinear()
+            .domain(d3.extent(data, function(d) { return d["Year"]; }))
+            .range([ 0, width ]);
+
+        var xAxis = svg.append("g")
+            .attr("class", "xaxis")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x).ticks(15, ".0f"));
+
+
+        function update(selectedOption) {
+
+            if (selectedOption === "Export & Import") {
+
+                d3.selectAll(".dollar").style("opacity", 0)
+                d3.selectAll(".line").style("opacity", 0)
+
+                formatValue = d3.format(".2s");
+                var y = d3.scaleLinear()
+                    .domain([0, 2500])
+                    .range([ height, 0 ]);
+                svg.append("g")
+                    .attr("class", "dollar")
+                    .call(d3.axisLeft(y).ticks(10).tickFormat(function(d) {
+                        if (formatValue(d).endsWith("k")) {
+                            return formatValue(d).replace('k', ' Trillion')
+                        }
+                        return '$'+ formatValue(d) + " Billion";
+                    }));
+
+
+                svg.append("path")
+                    .datum(data)
+                    .attr("class", "line")
+                    .attr("fill", "none")
+                    .attr("stroke", "#74b741")
+                    .attr("stroke-width", 1.5)
+                    .transition()
+                    .duration(3000)
+                    .attr("d", d3.line()
+                        .x(function(d) { return x(d["Year"]) })
+                        .y(function(d) { return y(d["IMP"]) })
+                    )
+
+                svg.append("path")
+                    .datum(data)
+                    .attr("class", "line")
+                    .attr("fill", "none")
+                    .attr("stroke", "steelblue")
+                    .attr("stroke-width", 1.5)
+                    .attr("d", d3.line()
+                        .x(function(d) { return x(+d["Year"]) })
+                        .y(function(d) { return y(+d["EXP"]) })
+                    )
+
+                tipBox = svg.append('rect')
+                    .attr('width', width)
+                    .attr('height', height)
+                    .attr('opacity', 0)
+                    .on('mousemove', drawTooltip)
+                    .on('mouseout', removeTooltip);
+
+            } else {
+
+                d3.selectAll(".dollar").style("opacity", 0)
+                d3.selectAll(".line").style("opacity", 0)
+                selectedData = data.map(function (d) {
+                    return {Year: d["Year"], EXP: d["NTRADE"]}
+                })
+                formatValue = d3.format(".2s");
+                var y = d3.scaleLinear()
+                    .domain([-900, 0])
+                    .range([ height, 0 ]);
+                svg.append("g")
+                    .attr("class", "dollar")
+                    .call(d3.axisLeft(y).ticks(10).tickFormat(function(d) {
+                        if (formatValue(d).endsWith("k")) {
+                            return formatValue(d).replace('k', ' Trillion')
+                        }
+                        return '$'+ formatValue(d) + " Billion";
+                    }));
+
+
+                svg.append("path")
+                    .datum(data)
+                    .attr("class", "line")
+                    .attr("fill", "none")
+                    .attr("stroke", "red")
+                    .attr("stroke-width", 1.5)
+                    .attr("d", d3.line()
+                        .x(function(d) { return x(+d["Year"]) })
+                        .y(function(d) { return y(+d["NTRADE"]) })
+                    )
+            }
+
+
+        }
+
+        d3.select("#selectButton").on("change", function(d) {
+            var selectedOption = d3.select(this).property("value")
+            update(selectedOption)
+        })
+
+        function removeTooltip() {
+            if (tooltip) tooltip.style('display', 'none');
+            if (tooltipLine) tooltipLine.attr('stroke', 'none');
+        }
+
+        function drawTooltip() {
+            //var s = d3.mouse(tipBox.node())[0]
+            const year = Math.floor((x.invert(d3.mouse(tipBox.node())[0]) + 1) / 1);
+
+
+            tooltipLine.attr('stroke', 'black')
+                .attr('x1', x(year))
+                .attr('x2', x(year))
+                .attr('y1', 0)
+                .attr('y2', height);
+
+            tooltip.html(year)
+                .style('display', 'block')
+                .style('left', (d3.event.pageX) + "px" )
+                .style("top", function () {
+                    return d3.event.pageY
+                })
+                .append('div')
+                .style('color', "blue")
+                .style("font-size", "10px")
+                .html(function () {
+                    for (var i = 0; i < data.length; i++) {
+                        if (data[i]["Year"] == year) {
+                            return "<p> Export: $<em>" + data[i]["EXP"] + "</em> billion dollars</p>" +
+                                "<p> Import: $<em>" + data[i]["IMP"] + "</em> billion dollars</p>" +
+                                (data[i]["NTRADE"] > 0 ? "<p> Net: $<em>" + data[i]["NTRADE"] + "</em> billion dollars</p>"
+                                    : "<p style = 'color: red'> Net: $<em>" + data[i]["NTRADE"] + "</em> billion dollars</p>")
+                        }
+                    }
+                })
+        }
+
+
+        update("Export & Import")
+
+        const linesSerires = [
+            {
+                name:"Export",
+                color: "steelblue"
+            },
+            {
+                name:"Import",
+                color: "#74b741"
+            },
+            {
+                name:"Net",
+                color: "red"
+            }
+        ];
+
+        var legendDot = svg.selectAll("dot")
+            .data(linesSerires);
+
+        legendDot.enter()
+            .append("circle")
+            .merge(legendDot)
+            .attr("cx", 150)
+            .attr("cy", function(d,i){ return height / 6 + i * 25})
+            .attr("r", 5)
+            .style("fill", function(d){ return d.color})
+
+        var legendLabels = svg.selectAll("label")
+            .data(linesSerires);
+
+        legendLabels.enter()
+            .append("text")
+            .merge(legendLabels)
+            .attr("x", 170)
+            .attr("y", function(d,i){ return height / 6 + i * 25})
+            .style("fill", function(d){ return d.color})
+            .text(function(d){ return d.name; })
+            .attr("text-anchor", "left")
+            .style("font-size","12px")
+            .style("alignment-baseline", "middle")
+
+    })
+
+</script>
