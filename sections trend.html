@@ -81,9 +81,10 @@
 
         svg.append("text")
             .attr("text-anchor", "left")
-            .attr("x", width / 2 - 100)
+            .attr("x", width / 2 - 120)
             .attr("y", -20 )
-            .text("Output Trends for Sections")
+            .style("fill", "steelblue")
+            .text("Brush to Zoom and Double Click to Restore")
             .attr("text-anchor", "start")
 
         formatValue = d3.format(".2s");
